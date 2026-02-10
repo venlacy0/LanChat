@@ -1,0 +1,406 @@
+/* Markdown 编辑器样式 */
+.markdown-editor-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 0;
+
+    /* 禁止玻璃拟态：只做纯色遮罩，不使用模糊背景 */
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--animation-duration-normal) var(--animation-easing-smooth),
+        background var(--animation-duration-normal) var(--animation-easing-smooth);
+}
+
+.markdown-editor-overlay.active {
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.markdown-editor-overlay.active.closing {
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.markdown-editor-container {
+    background: var(--input-bg);
+    border-radius: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 60vh;
+    max-height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 -8px 32px var(--shadow-color);
+    overflow: hidden;
+
+    /* 用 transform/opacity 替代 height 动画，减少回流和卡顿 */
+    transform: translate3d(0, 24px, 0);
+    opacity: 0;
+    will-change: transform, opacity;
+    transition: transform var(--animation-duration-normal) var(--animation-easing-smooth),
+        opacity var(--animation-duration-normal) var(--animation-easing-smooth);
+}
+
+.markdown-editor-overlay.active .markdown-editor-container {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+}
+
+.markdown-editor-overlay.active.closing .markdown-editor-container,
+.markdown-editor-container.closing {
+    transform: translate3d(0, 24px, 0);
+    opacity: 0;
+}
+
+.markdown-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.markdown-editor-header h3 {
+    color: var(--text-color);
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.markdown-editor-close {
+    background: transparent;
+    border: none;
+    color: var(--secondary-text);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: color var(--animation-duration-fast) var(--animation-easing-smooth),
+        background-color var(--animation-duration-fast) var(--animation-easing-smooth),
+        transform var(--animation-duration-fast) var(--animation-easing-smooth);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.markdown-editor-close:hover {
+    background: var(--chat-bg);
+    color: var(--text-color);
+    transform: rotate(90deg);
+}
+
+.markdown-editor-close:active {
+    transform: rotate(90deg) scale(0.9);
+}
+
+.markdown-editor-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+    animation: splitAppear var(--animation-duration-normal) var(--animation-easing-smooth) 0.1s forwards;
+    opacity: 0;
+}
+
+@keyframes splitAppear {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.markdown-input {
+    flex: 1;
+    border: none;
+    border-right: 1px solid var(--border-color);
+    background-color: var(--msg-bg);
+    color: var(--text-color);
+    padding: 16px 20px;
+    font-size: 0.95rem;
+    resize: none;
+    outline: none;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    line-height: 1.6;
+    overflow-y: auto;
+    -webkit-appearance: none;
+    animation: splitLineAppear var(--animation-duration-normal) var(--animation-easing-smooth) 0.2s both;
+}
+
+@keyframes splitLineAppear {
+    0% {
+        border-right: none;
+    }
+
+    50% {
+        border-right: 1px solid transparent;
+    }
+
+    100% {
+        border-right: 1px solid var(--border-color);
+    }
+}
+
+.markdown-input::-webkit-scrollbar {
+    width: 8px;
+}
+
+.markdown-input::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-input::-webkit-scrollbar-thumb {
+    background-color: var(--accent-color);
+    border-radius: 4px;
+    opacity: 0.5;
+}
+
+.markdown-preview {
+    flex: 1;
+    background-color: var(--chat-bg);
+    padding: 16px 20px;
+    overflow-y: auto;
+    border-radius: 0;
+}
+
+.markdown-preview::-webkit-scrollbar {
+    width: 8px;
+}
+
+.markdown-preview::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb {
+    background-color: var(--accent-color);
+    border-radius: 4px;
+    opacity: 0.5;
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+    color: var(--text-color);
+    margin: 16px 0 8px 0;
+    font-weight: 700;
+}
+
+.markdown-preview h1 {
+    font-size: 2rem;
+}
+
+.markdown-preview h2 {
+    font-size: 1.75rem;
+}
+
+.markdown-preview h3 {
+    font-size: 1.5rem;
+}
+
+.markdown-preview h4 {
+    font-size: 1.25rem;
+}
+
+.markdown-preview h5 {
+    font-size: 1.1rem;
+}
+
+.markdown-preview h6 {
+    font-size: 1rem;
+}
+
+.markdown-preview p,
+.markdown-preview li,
+.markdown-preview blockquote {
+    color: var(--text-color);
+    line-height: 1.6;
+    margin: 8px 0;
+}
+
+.markdown-preview blockquote {
+    border-left: 4px solid var(--accent-color);
+    padding-left: 12px;
+    margin-left: 0;
+    color: var(--secondary-text);
+}
+
+.markdown-preview code {
+    background: var(--msg-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.markdown-preview pre {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.markdown-preview pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+    border: none;
+}
+
+.markdown-preview a {
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: color var(--animation-duration-fast) var(--animation-easing-smooth);
+}
+
+.markdown-preview a:hover {
+    text-decoration: underline;
+}
+
+/* iframe 嵌入基础样式 */
+.markdown-preview iframe,
+.message-content iframe {
+    display: block;
+    max-width: 100%;
+    border: none;
+    border-radius: 8px;
+    margin: 8px 0;
+    background: var(--msg-bg);
+}
+
+/* 视频嵌入 - 16:9 响应式自适应 */
+.markdown-preview iframe.embed-video,
+.message-content iframe.embed-video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+}
+
+/* 音乐嵌入 - 尊重原始尺寸，紧凑显示 */
+.markdown-preview iframe.embed-music,
+.message-content iframe.embed-music {
+    width: 100%;
+    max-height: 400px;
+}
+
+/* 未分类的 iframe 回退：有 width/height 属性时尊重原始尺寸，否则按 16:9 */
+.markdown-preview iframe:not(.embed-video):not(.embed-music),
+.message-content iframe:not(.embed-video):not(.embed-music) {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    height: auto;
+}
+
+/* 包含 iframe 嵌入的消息气泡自动撑宽（JS 添加 .has-embed class） */
+.message.has-embed {
+    max-width: 96%;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.markdown-preview li {
+    margin: 4px 0;
+}
+
+.markdown-preview strong {
+    font-weight: 700;
+    color: var(--text-color);
+}
+
+.markdown-preview em {
+    font-style: italic;
+    color: var(--text-color);
+}
+
+.markdown-editor-actions {
+    display: flex;
+    gap: 15px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+    background: var(--input-bg);
+    flex-shrink: 0;
+}
+
+.markdown-editor-action-btn {
+    flex: 1;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform var(--animation-duration-fast) var(--animation-easing-smooth),
+        box-shadow var(--animation-duration-fast) var(--animation-easing-smooth),
+        background-color var(--animation-duration-fast) var(--animation-easing-smooth),
+        color var(--animation-duration-fast) var(--animation-easing-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.markdown-editor-action-btn.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.markdown-editor-action-btn.secondary {
+    background: var(--secondary-text);
+    color: white;
+}
+
+.markdown-editor-action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.markdown-editor-action-btn:active {
+    transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+    .markdown-editor-container {
+        width: 95vw;
+        height: 90vh;
+        max-width: none;
+        max-height: none;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .markdown-editor-input,
+    .markdown-preview {
+        font-size: 0.9rem;
+    }
+}

@@ -1,0 +1,572 @@
+/* File Upload Styles */
+.file-upload-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 禁止玻璃拟态：不使用 backdrop-filter 模糊 */
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity var(--animation-duration-normal) var(--animation-easing-standard),
+        background var(--animation-duration-normal) var(--animation-easing-standard);
+}
+
+.file-upload-overlay.active {
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.file-upload-overlay.active.closing {
+    background: rgba(0, 0, 0, 0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.file-upload-modal {
+    background: var(--input-bg);
+    border-radius: var(--border-radius-modal);
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 8px 32px var(--shadow-color);
+
+    /* 用 transform/opacity 过渡替代关键帧，避免首次加载就播放动画 */
+    opacity: 0;
+    transform: scale(0.98) translateY(12px);
+    will-change: transform, opacity;
+    transition: transform var(--animation-duration-normal) var(--animation-easing-smooth),
+        opacity var(--animation-duration-normal) var(--animation-easing-smooth);
+}
+
+.file-upload-overlay.active .file-upload-modal {
+    opacity: 1;
+    transform: none;
+}
+
+.file-upload-overlay.active.closing .file-upload-modal {
+    opacity: 0;
+    transform: scale(0.98) translateY(12px);
+}
+
+.file-upload-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.file-upload-header h3 {
+    color: var(--text-color);
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.file-upload-close {
+    background: transparent;
+    border: none;
+    color: var(--secondary-text);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+    transition: all var(--animation-duration-fast) var(--animation-easing-standard);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.file-upload-close:hover {
+    background: var(--chat-bg);
+    color: var(--text-color);
+    transform: rotate(90deg);
+}
+
+.file-upload-close:active {
+    transform: rotate(90deg) scale(0.9);
+}
+
+.file-info {
+    background: var(--chat-bg);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    border: 2px dashed var(--border-color);
+}
+
+.file-info-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    color: var(--text-color);
+}
+
+.file-info-item:last-child {
+    margin-bottom: 0;
+}
+
+.file-info-item i {
+    color: var(--accent-color);
+    font-size: 1.2rem;
+}
+
+.file-info-label {
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.file-info-value {
+    color: var(--secondary-text);
+}
+
+.file-message-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--msg-bg);
+    color: var(--text-color);
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 80px;
+    margin-bottom: 20px;
+    transition: all var(--animation-duration-fast) var(--animation-easing-standard);
+}
+
+.file-message-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 20%, transparent);
+    transform: translateY(-2px);
+}
+
+.file-upload-actions {
+    display: flex;
+    gap: 15px;
+}
+
+.file-upload-btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--animation-duration-fast) var(--animation-easing-standard);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.file-upload-btn.primary {
+    background: var(--accent-color);
+    color: white;
+}
+
+.file-upload-btn.secondary {
+    background: var(--secondary-text);
+    color: white;
+}
+
+.file-upload-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.file-upload-btn:active {
+    transform: scale(0.95);
+}
+
+.drag-drop-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(66, 153, 225, 0);
+    border: 4px dashed transparent;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: background var(--animation-duration-fast) var(--animation-easing-standard),
+        border-color var(--animation-duration-fast) var(--animation-easing-standard);
+}
+
+.drag-drop-zone.active {
+    display: flex;
+    background: rgba(66, 153, 225, 0.1);
+    border-color: var(--accent-color);
+    animation: fadeIn var(--animation-duration-fast) var(--animation-easing-standard);
+}
+
+.drag-drop-text {
+    background: var(--input-bg);
+    padding: 40px 60px;
+    border-radius: var(--border-radius-modal);
+    box-shadow: 0 8px 32px var(--shadow-color);
+    text-align: center;
+    animation: bounceIn var(--animation-duration-normal) var(--animation-easing-smooth);
+}
+
+.drag-drop-text i {
+    font-size: 4rem;
+    color: var(--accent-color);
+    margin-bottom: 20px;
+    display: block;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.drag-drop-text p {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+/* 文件消息整体卡片：铺满内容区域，避免多余留白 */
+.message-content .file-message-card {
+    width: 100%;
+}
+
+.file-message-card {
+    /* 避免“白卡叠白卡”：用柔和底色区分消息气泡与附件卡片 */
+    background: color-mix(in srgb, var(--accent-color) 4%, var(--msg-bg));
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--accent-color) 12%, var(--border-color));
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: var(--shadow-sm);
+}
+
+/* 自己发送的附件卡片：更贴近 own 气泡底色，减少“灰块突兀感” */
+.message.own .file-message-card {
+    background: color-mix(in srgb, var(--accent-color) 4%, var(--own-msg-bg));
+    border-color: color-mix(in srgb, var(--accent-color) 14%, var(--own-reply-border));
+}
+
+.file-message-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    min-width: 0;
+}
+
+.file-message-header .file-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+}
+
+.file-icon {
+    width: 44px;
+    height: 44px;
+    background: color-mix(in srgb, var(--accent-color) 14%, var(--chat-bg));
+    border: 1px solid color-mix(in srgb, var(--accent-color) 24%, var(--border-color));
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-color);
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.file-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.file-name {
+    font-weight: 800;
+    color: var(--text-color);
+    margin: 0;
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.25;
+}
+
+.file-size {
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+    margin: 0;
+}
+
+.file-download-btn {
+    background: color-mix(in srgb, var(--accent-color) 10%, var(--chat-bg));
+    color: color-mix(in srgb, var(--accent-color) 85%, var(--text-color));
+    border: 1px solid color-mix(in srgb, var(--accent-color) 16%, var(--border-color));
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform var(--animation-duration-fast) var(--animation-easing-smooth),
+        box-shadow var(--animation-duration-fast) var(--animation-easing-smooth),
+        background-color var(--animation-duration-fast) var(--animation-easing-smooth),
+        border-color var(--animation-duration-fast) var(--animation-easing-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    min-height: 44px; /* 触控目标 */
+}
+
+/* 头部的下载按钮更紧凑（用于非可预览文件类型） */
+.file-message-header .file-download-btn {
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-weight: 800;
+}
+
+.file-message-footer .file-download-btn {
+    flex: 1 1 160px;
+}
+
+.file-message-text {
+    margin: 0;
+    color: var(--text-color);
+    line-height: 1.55;
+}
+
+/* 图片消息样式 */
+.file-message-card.image-message {
+    border-left: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-message-card.image-message .file-image {
+    width: 100%;
+    max-height: 400px;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block;
+    margin-bottom: 0;
+}
+
+.file-message-card.image-message .file-message-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    background: var(--chat-bg);
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+}
+
+.file-message-card.image-message .file-name {
+    flex: 1;
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+.file-message-card.image-message .file-size {
+    white-space: nowrap;
+}
+
+/* 文档消息样式 */
+.file-message-card.document-message {
+    /* 复用统一附件卡片样式即可 */
+    border-left: none;
+}
+
+.file-message-card.document-message .file-message-header {
+    margin: 0;
+    padding: 0;
+    border-bottom: none;
+}
+
+.file-preview-container {
+    width: 100%;
+    max-height: 0;
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--accent-color) 10%, var(--border-color));
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--chat-bg);
+    padding: 0 10px;
+    opacity: 0;
+    display: none;
+    transform: translateY(-4px) scale(0.995);
+    transform-origin: top;
+    pointer-events: none;
+    transition: max-height var(--animation-duration-normal) var(--animation-easing-smooth),
+        padding var(--animation-duration-fast) var(--animation-easing-smooth),
+        margin var(--animation-duration-fast) var(--animation-easing-smooth),
+        opacity var(--animation-duration-fast) var(--animation-easing-smooth),
+        transform var(--animation-duration-normal) var(--animation-easing-smooth);
+}
+
+.file-preview-container.active {
+    display: block;
+    max-height: 240px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    border: 1px solid color-mix(in srgb, var(--accent-color) 10%, var(--border-color));
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: all;
+    overflow: auto;
+    box-shadow: var(--shadow-sm);
+}
+
+.file-preview-container.closing {
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.file-preview-container.active.closing {
+    max-height: 0;
+    padding: 0 10px;
+    margin: 0;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.995);
+}
+
+.file-preview {
+    width: 100%;
+    height: 100%;
+    border: none;
+}
+
+.file-preview-content {
+    width: 100%;
+    line-height: 1.5;
+    color: var(--text-color);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+.file-preview-content p {
+    margin: 0.5em 0;
+}
+
+.file-preview-content code {
+    background: var(--chat-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+}
+
+.file-preview-content pre {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 12px 0;
+}
+
+.file-preview-content pre code {
+    background: none;
+    padding: 0;
+    color: inherit;
+}
+
+.file-preview-error {
+    color: var(--danger-color);
+    padding: 12px;
+    text-align: center;
+    font-weight: 600;
+}
+
+.file-message-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    border-top: none;
+    flex-wrap: wrap;
+}
+
+.file-preview-btn {
+    background: var(--chat-bg);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--accent-color) 14%, var(--border-color));
+    padding: 10px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform var(--animation-duration-fast) var(--animation-easing-smooth),
+        box-shadow var(--animation-duration-fast) var(--animation-easing-smooth),
+        background-color var(--animation-duration-fast) var(--animation-easing-smooth),
+        border-color var(--animation-duration-fast) var(--animation-easing-smooth);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    min-height: 44px; /* 触控目标 */
+    flex: 1 1 160px;
+}
+
+.file-preview-btn.active {
+    background: color-mix(in srgb, var(--secondary-text) 14%, var(--chat-bg));
+    border-color: color-mix(in srgb, var(--secondary-text) 18%, var(--border-color));
+    color: var(--text-color);
+}
+
+/* Hover/Active/Focus 统一交互（桌面端才启用 hover 提升） */
+@media (hover: hover) and (pointer: fine) {
+    .file-download-btn:hover,
+    .file-preview-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+        border-color: color-mix(in srgb, var(--accent-color) 26%, var(--border-color));
+    }
+}
+
+.file-download-btn:active,
+.file-preview-btn:active {
+    transform: translateY(0) scale(0.985);
+    box-shadow: var(--shadow-sm);
+}
+
+.file-download-btn:focus-visible,
+.file-preview-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 18%, transparent), var(--shadow-md);
+}
+
+@media (min-width: 1200px) {
+    #scrollToBottomBtn {
+        right: 20px;
+        left: auto;
+    }
+}
+
+.user-item {
+    position: relative;

@@ -1,0 +1,58 @@
+# 数据文件
+data/*.json
+data/*.log
+data/*.txt
+data/.installed
+!data/.gitkeep
+
+# 上传文件
+uploads/*
+!uploads/.gitkeep
+
+# 头像文件
+avatars/*
+!avatars/.gitkeep
+
+# 日志文件
+logs/*
+!logs/.gitkeep
+
+# 环境变量
+.env
+.env.local
+
+# IDE 和编辑器
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+tmp_*
+*.tmp
+*.bak
+*.cache
+
+# Python
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# FTP 同步
+.ftp_sync_state.json
+
+# 测试文件
+test_*.html
+test_*.php
+reset_database.php

@@ -1,0 +1,3 @@
+/* Deprecated: styles split into smaller files. */
+@import url('./chat/base.css');
+@import url('./chat/responsive.css');

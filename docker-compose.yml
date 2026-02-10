@@ -1,0 +1,65 @@
+services:
+  # Web 服务（PHP + Apache）
+  web:
+    build: .
+    container_name: venlanchat-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./data:/var/www/html/data
+      - ./uploads:/var/www/html/uploads
+      - ./avatars:/var/www/html/avatars
+      - ./logs:/var/www/html/logs
+    environment:
+      - TZ=Asia/Shanghai
+    depends_on:
+      - db
+    networks:
+      - venlanchat-network
+    restart: unless-stopped
+
+  # MySQL 数据库服务
+  db:
+    image: mysql:8.0
+    container_name: venlanchat-db
+    environment:
+      MYSQL_ROOT_PASSWORD: venlanchat_root_2026
+      MYSQL_DATABASE: venlanchat
+      MYSQL_USER: venlanchat_user
+      MYSQL_PASSWORD: venlanchat_pass_2026
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3306:3306"
+    networks:
+      - venlanchat-network
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # phpMyAdmin（可选，用于管理数据库）
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:latest
+    container_name: venlanchat-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: venlanchat_user
+      PMA_PASSWORD: venlanchat_pass_2026
+      UPLOAD_LIMIT: 50M
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - venlanchat-network
+    restart: unless-stopped
+
+networks:
+  venlanchat-network:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local

@@ -1,0 +1,231 @@
+<?php
+// 更新用户最后在线时间
+updateLastSeen($_SESSION['user_id']);
+
+$lastPublicTimestamp = intval($_POST['lastPublicTimestamp'] ?? 0);
+$lastPrivateTimestamp = intval($_POST['lastPrivateTimestamp'] ?? 0);
+$currentReceiverId = intval($_POST['currentReceiverId'] ?? 0);
+
+try {
+    $mysqli = get_db_connection();
+
+    // 1) 查询新的公聊消息
+    $stmt = $mysqli->prepare("
+        SELECT
+            id,
+            user_id,
+            username,
+            avatar,
+            message,
+            reply_to_id,
+            UNIX_TIMESTAMP(timestamp) as timestamp,
+            ip,
+            recalled
+        FROM public_messages
+        WHERE timestamp > FROM_UNIXTIME(?) AND recalled = FALSE
+        ORDER BY timestamp ASC
+    ");
+    if (!$stmt) {
+        throw new Exception('公聊查询准备失败');
+    }
+    $stmt->bind_param("i", $lastPublicTimestamp);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $parsedPublicMessages = [];
+    while ($row = $result->fetch_assoc()) {
+        // 如果有 reply_to_id，查询被回复的消息
+        $reply_to = null;
+        if (!empty($row['reply_to_id'])) {
+            $reply_stmt = $mysqli->prepare("
+                SELECT username, avatar, message
+                FROM public_messages
+                WHERE id = ?
+            ");
+            if ($reply_stmt) {
+                $reply_stmt->bind_param("i", $row['reply_to_id']);
+                $reply_stmt->execute();
+                if ($reply_result = $reply_stmt->get_result()->fetch_assoc()) {
+                    $reply_to = [
+                        'message' => $reply_result['message'],
+                        'username' => $reply_result['username'],
+                        'avatar' => $reply_result['avatar']
+                    ];
+                }
+                $reply_stmt->close();
+            }
+        }
+
+        // 检查是否为文件消息，如果是则不进行 Markdown 解析
+        $isFileMessage = false;
+        if (is_string($row['message'])) {
+            $trimmed = trim($row['message']);
+            if (strpos($trimmed, '{') === 0) {
+                $decoded = json_decode($row['message'], true);
+                if ($decoded && isset($decoded['type']) && $decoded['type'] === 'file') {
+                    $isFileMessage = true;
+                }
+            }
+        }
+        if (!$isFileMessage) {
+            $row['message'] = customParseAllowHtml($row['message'], $parsedown);
+        }
+
+        if (!empty($reply_to) && isset($reply_to['message']) && is_string($reply_to['message'])) {
+            $isReplyFileMessage = false;
+            $trimmedReply = trim($reply_to['message']);
+            if (strpos($trimmedReply, '{') === 0) {
+                $decodedReply = json_decode($reply_to['message'], true);
+                if ($decodedReply && isset($decodedReply['type']) && $decodedReply['type'] === 'file') {
+                    $isReplyFileMessage = true;
+                }
+            }
+            if (!$isReplyFileMessage) {
+                $reply_to['message'] = customParseAllowHtml($reply_to['message'], $parsedown);
+            }
+        }
+
+        $parsedPublicMessages[] = [
+            'id' => (int)$row['id'],
+            'user_id' => (int)$row['user_id'],
+            'username' => $row['username'],
+            'avatar' => $row['avatar'],
+            'message' => $row['message'],
+            'reply_to' => $reply_to,
+            'timestamp' => (int)$row['timestamp'],
+            'ip' => $row['ip'],
+            'recalled' => (bool)$row['recalled']
+        ];
+    }
+    $stmt->close();
+
+    // 2) 查询新的私聊消息
+    $parsedPrivateMessages = [];
+    if ($currentReceiverId > 0 && $_SESSION['user_id'] > 0) {
+        $stmt = $mysqli->prepare("
+            SELECT pm.*, u1.username as sender_username, u1.avatar as sender_avatar
+            FROM private_messages pm
+            JOIN users u1 ON pm.sender_id = u1.id
+            WHERE ((pm.sender_id = ? AND pm.receiver_id = ?) OR (pm.sender_id = ? AND pm.receiver_id = ?))
+            AND pm.timestamp > FROM_UNIXTIME(?) AND pm.recalled = FALSE
+            ORDER BY pm.timestamp ASC
+        ");
+        if (!$stmt) {
+            throw new Exception('私聊查询准备失败');
+        }
+        $stmt->bind_param("iiiii", $_SESSION['user_id'], $currentReceiverId, $currentReceiverId, $_SESSION['user_id'], $lastPrivateTimestamp);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        while ($row = $result->fetch_assoc()) {
+            // 检查是否为文件消息，如果是则不进行 Markdown 解析
+            $isFileMessage = false;
+            if (is_string($row['message'])) {
+                $trimmed = trim($row['message']);
+                if (strpos($trimmed, '{') === 0) {
+                    $decoded = json_decode($row['message'], true);
+                    if ($decoded && isset($decoded['type']) && $decoded['type'] === 'file') {
+                        $isFileMessage = true;
+                    }
+                }
+            }
+            if (!$isFileMessage) {
+                $row['message'] = customParseAllowHtml($row['message'], $parsedown);
+            }
+
+            if (!empty($row['reply_to_id'])) {
+                $replyStmt = $mysqli->prepare("
+                    SELECT pm.message, u1.username as sender_username
+                    FROM private_messages pm
+                    JOIN users u1 ON pm.sender_id = u1.id
+                    WHERE pm.id = ?
+                ");
+                if ($replyStmt) {
+                    $replyStmt->bind_param("i", $row['reply_to_id']);
+                    $replyStmt->execute();
+                    if ($reply = $replyStmt->get_result()->fetch_assoc()) {
+                        $isReplyFileMessage = false;
+                        if (is_string($reply['message'])) {
+                            $trimmed = trim($reply['message']);
+                            if (strpos($trimmed, '{') === 0) {
+                                $decoded = json_decode($reply['message'], true);
+                                if ($decoded && isset($decoded['type']) && $decoded['type'] === 'file') {
+                                    $isReplyFileMessage = true;
+                                }
+                            }
+                        }
+                        if (!$isReplyFileMessage) {
+                            $reply['message'] = customParseAllowHtml($reply['message'], $parsedown);
+                        }
+
+                        $row['reply_to'] = [
+                            'message' => $reply['message'],
+                            'username' => $reply['sender_username']
+                        ];
+                    }
+                    $replyStmt->close();
+                }
+            }
+
+            $row['timestamp'] = strtotime($row['timestamp']);
+            $parsedPrivateMessages[] = $row;
+        }
+        $stmt->close();
+    }
+
+    // 3) 检查已撤回的公聊消息
+    $recalledPublicIds = [];
+    $stmt = $mysqli->prepare("
+        SELECT id
+        FROM public_messages
+        WHERE timestamp > FROM_UNIXTIME(?)
+        AND recalled = TRUE
+    ");
+    if (!$stmt) {
+        throw new Exception('撤回公聊查询准备失败');
+    }
+    $stmt->bind_param("i", $lastPublicTimestamp);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $recalledPublicIds[] = (int)$row['id'];
+    }
+    $stmt->close();
+
+    // 4) 检查已撤回的私聊消息
+    $recalledPrivateIds = [];
+    if ($currentReceiverId > 0 && $_SESSION['user_id'] > 0) {
+        $stmt = $mysqli->prepare("
+            SELECT id
+            FROM private_messages
+            WHERE ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?))
+            AND timestamp > FROM_UNIXTIME(?)
+            AND recalled = TRUE
+        ");
+        if (!$stmt) {
+            throw new Exception('撤回私聊查询准备失败');
+        }
+        $stmt->bind_param("iiiii", $_SESSION['user_id'], $currentReceiverId, $currentReceiverId, $_SESSION['user_id'], $lastPrivateTimestamp);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $recalledPrivateIds[] = (int)$row['id'];
+        }
+        $stmt->close();
+    }
+
+    $mysqli->close();
+
+    echo json_encode([
+        'success' => true,
+        'newPublicMessages' => $parsedPublicMessages,
+        'newPrivateMessages' => $parsedPrivateMessages,
+        'recalledPublicIds' => $recalledPublicIds,
+        'recalledPrivateIds' => $recalledPrivateIds
+    ]);
+} catch (Throwable $e) {
+    if (isset($mysqli) && $mysqli instanceof mysqli) {
+        $mysqli->close();
+    }
+    echo json_encode(['success' => false, 'message' => '获取新消息失败: ' . $e->getMessage()]);
+}

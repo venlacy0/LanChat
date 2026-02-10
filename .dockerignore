@@ -1,0 +1,50 @@
+# Git 相关
+.git
+.gitignore
+.gitattributes
+
+# 文档和说明
+*.md
+CLAUDE.md
+README.md
+AGENTS.md
+docs/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+*~
+
+# 日志文件
+logs/*.log
+data/*.log
+
+# 临时文件
+*.tmp
+*.bak
+*.cache
+
+# Node 模块（如果有）
+node_modules/
+package-lock.json
+
+# Python 缓存（如果有）
+__pycache__/
+*.pyc
+.ruff_cache/
+
+# 数据库文件
+*.sql
+*.db
+*.sqlite
+
+# 环境变量文件
+.env
+.env.local
+
+# Docker 相关
+docker-compose.override.yml
+.dockerignore
