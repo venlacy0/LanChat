@@ -4,11 +4,11 @@ VenlanChat 是一个基于 PHP + MySQL 的轻量实时聊天室，包含公共�
 
 ## 界面展示
 
-![image-20260210182342502](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182342502.png)
+![image-20260210182342502](docs/images/image-20260210182342502.png)
 
-![image-20260210182411801](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182411801.png)
+![image-20260210182411801](docs/images/image-20260210182411801.png)
 
-![image-20260210182457273](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182457273.png)
+![image-20260210182457273](docs/images/image-20260210182457273.png)
 
 ## 功能概览
 
