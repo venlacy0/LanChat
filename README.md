@@ -2,6 +2,14 @@
 
 VenlanChat 是一个基于 PHP + MySQL 的轻量实时聊天室，包含公共聊天与私聊两种模式，支持 Markdown 渲染、代码高亮、数学公式与文件上传预览等能力。
 
+## 界面展示
+
+![image-20260210182342502](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182342502.png)
+
+![image-20260210182411801](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182411801.png)
+
+![image-20260210182457273](C:\Users\zh301\AppData\Roaming\Typora\typora-user-images\image-20260210182457273.png)
+
 ## 功能概览
 
 - 用户注册、登录、头像
@@ -11,6 +19,7 @@ VenlanChat 是一个基于 PHP + MySQL 的轻量实时聊天室，包含公共�
 - Markdown 渲染（后端 Parsedown + 前端安全过滤）
 - 文件上传（图片直显；`pdf/txt/md` 支持预览）
 - 用户外观设置（保存在 `data/settings_{user_id}.json`）
+- iframe链接嵌入
 
 ## 运行方式
 

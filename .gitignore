@@ -56,3 +56,5 @@ package-lock.json
 test_*.html
 test_*.php
 reset_database.php
+
+.codeartsdoer
