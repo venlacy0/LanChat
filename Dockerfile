@@ -13,12 +13,12 @@ WORKDIR /var/www/html
 COPY . /var/www/html/
 
 # 设置目录权限
-RUN chown -R www-data:www-data /var/www/html \
+# 说明：data/uploads/avatars/logs 可能在仓库中不存在（常被 .gitignore 忽略），
+# 但运行时需要可写目录；构建阶段先创建，避免 chmod 报错。
+RUN mkdir -p /var/www/html/data /var/www/html/uploads /var/www/html/avatars /var/www/html/logs \
+    && chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
-    && chmod -R 777 /var/www/html/data \
-    && chmod -R 777 /var/www/html/uploads \
-    && chmod -R 777 /var/www/html/avatars \
-    && chmod -R 777 /var/www/html/logs
+    && chmod -R 777 /var/www/html/data /var/www/html/uploads /var/www/html/avatars /var/www/html/logs
 
 # 暴露端口
 EXPOSE 80

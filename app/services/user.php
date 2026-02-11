@@ -14,11 +14,22 @@ function getCurrentUser(mysqli $mysqli, int $userId): ?array
 
 function ensureAvatar(?string $avatar): string
 {
+    // 默认头像：使用项目内静态资源，避免 data URL 过长导致写入数据库失败（avatar 列通常是 VARCHAR(255)）。
+    $default = 'assets/images/default_avatar.svg';
+
     if (!empty($avatar)) {
-        return $avatar;
+        $normalized = trim((string)$avatar);
+        if (
+            $normalized !== '' &&
+            stripos($normalized, 'default_avatar.png') === false &&
+            stripos($normalized, 'default_avatar.svg') === false &&
+            stripos($normalized, 'data:image/') !== 0
+        ) {
+            return $normalized;
+        }
     }
 
-    return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"%3E%3Ccircle cx="50" cy="50" r="50" fill="%23e2e8f0"/%3E%3Ccircle cx="50" cy="35" r="18" fill="%2394a3b8"/%3E%3Cpath d="M 20 85 Q 20 60 50 60 Q 80 60 80 85 Z" fill="%2394a3b8"/%3E%3C/svg%3E';
+    return $default;
 }
 
 function updateLastSeen(int $user_id): bool

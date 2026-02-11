@@ -110,11 +110,17 @@ function get_db_connection() {
     $config = require 'config.php';
     $db_config = $config['db'];
     
+    $port = isset($db_config['port']) ? (int)$db_config['port'] : 3306;
+    if ($port <= 0) {
+        $port = 3306;
+    }
+
     $mysqli = new mysqli(
         $db_config['host'],
         $db_config['user'],
         $db_config['pass'],
-        $db_config['name']
+        $db_config['name'],
+        $port
     );
     
     if ($mysqli->connect_error) {

@@ -140,22 +140,36 @@
 	            return isPublicChat ? latestPublicTimestamp : latestPrivateTimestamp;
 	        }
 
+	        function getLatestId() {
+	            return isPublicChat ? latestPublicId : latestPrivateId;
+	        }
+
+	        // 统一消息 ID 为 number，避免 string/number 混用导致 Set 去重/删除失效
+	        function normalizeMessageId(id) {
+	            const n = Number(id);
+	            return (n && isFinite(n)) ? n : 0;
+	        }
+
 	        function serverHasAllDisplayed(serverMessages) {
 	            if (!Array.isArray(serverMessages) || displayedMessageIds.size === 0) return true;
 	            const serverIds = new Set();
 	            serverMessages.forEach(msg => {
-	                if (msg && msg.id) serverIds.add(msg.id);
+	                const id = normalizeMessageId(msg && msg.id);
+	                if (id) serverIds.add(id);
 	            });
 	            for (const id of displayedMessageIds) {
-	                if (!serverIds.has(id)) return false;
+	                if (!serverIds.has(normalizeMessageId(id))) return false;
 	            }
 	            return true;
 	        }
 
 	        function appendNewMessagesFromServer(serverMessages) {
-	            const latestTs = getLatestTimestamp();
+	            const latestId = normalizeMessageId(getLatestId());
 	            const fresh = serverMessages
-	                .filter(msg => msg && !displayedMessageIds.has(msg.id) && msg.timestamp > latestTs)
+	                .filter(msg => {
+	                    const id = normalizeMessageId(msg && msg.id);
+	                    return id && !displayedMessageIds.has(id) && id > latestId;
+	                })
 	                .reverse(); // server is new->old, append needs old->new
 	            if (fresh.length > 0) {
 	                appendMessagesBatch(fresh);
@@ -230,8 +244,9 @@
                 let added = 0;
 
                 ordered.forEach((msg) => {
-                    if (!msg || !msg.id || displayedMessageIds.has(msg.id)) return;
-                    displayedMessageIds.add(msg.id);
+                    const id = normalizeMessageId(msg && msg.id);
+                    if (!id || displayedMessageIds.has(id)) return;
+                    displayedMessageIds.add(id);
                     const el = createMessageElement(msg);
                     el.style.animation = 'none';
                     fragment.appendChild(el);
@@ -544,8 +559,10 @@
 	            displayedMessageIds.clear();
 	            if (isPublicChat) {
 	                latestPublicTimestamp = 0;
+	                latestPublicId = 0;
 	            } else {
 	                latestPrivateTimestamp = 0;
+	                latestPrivateId = 0;
 	            }
 
             // 保存原始顺序（从后端来的就是「最新在前」）
@@ -574,7 +591,9 @@
 	                        el.style.animation = 'none';
 	                        fragment.appendChild(el);
 	                        updateLatestTimestamp(msg.timestamp);
-	                        displayedMessageIds.add(msg.id);
+	                        updateLatestId(msg.id);
+	                        const mid = normalizeMessageId(msg.id);
+	                        if (mid) displayedMessageIds.add(mid);
 	                        if (!needsMath && contentMayContainMath(msg.message)) needsMath = true;
 	                        if (!needsHighlight && typeof msg.message === 'string' && /<pre|<code/i.test(msg.message)) needsHighlight = true;
 	                    } catch (error) {
@@ -616,7 +635,9 @@
             const el = document.createElement('div');
             el.className = 'message';
             el.dataset.messageId = msg.id;
-            if (msg.user_id === currentUserId || msg.sender_id === currentUserId) el.classList.add('own');
+            if (Number(msg.user_id) === Number(currentUserId) || Number(msg.sender_id) === Number(currentUserId)) {
+                el.classList.add('own');
+            }
 
             // 回复预览必须做转义/过滤，避免 XSS（reply_to.message 可能包含 HTML 或文件 JSON）
             let replyHtml = '';
@@ -810,6 +831,12 @@
                 return normalized;
             }
 
+            // 静态资源（assets/）不需要代理（file_proxy 仅允许 uploads/avatars，会导致 403）
+            const stripped = normalized.replace(/^\/+/, '');
+            if (stripped.toLowerCase().startsWith('assets/')) {
+                return normalized;
+            }
+
             // 如果已经包含 file_proxy.php，说明已经被处理过，直接返回
             if (lower.includes('file_proxy.php')) {
                 return normalized;
@@ -928,7 +955,10 @@
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        contentElement.innerHTML = data.content;
+                        // data.content 可能包含由服务端 Markdown 生成的 HTML，插入 DOM 前先做一次前端过滤
+                        const raw = (data && data.content !== undefined && data.content !== null) ? String(data.content) : '';
+                        const safe = (typeof sanitizeHtml === 'function') ? sanitizeHtml(raw) : raw;
+                        contentElement.innerHTML = safe;
                         // 如果是 Markdown，重新渲染
                         if (fileType === 'md') {
                         if (typeof MathJax !== 'undefined' && typeof MathJax.typesetPromise === 'function') {
@@ -944,7 +974,8 @@
                             if (onComplete) onComplete();
                         }
                     } else {
-                        contentElement.innerHTML = `<div class="file-preview-error">加载失败: ${data.message}</div>`;
+                        const msg = (data && data.message !== undefined && data.message !== null) ? String(data.message) : '未知错误';
+                        contentElement.innerHTML = `<div class="file-preview-error">加载失败: ${escapeHtml(msg)}</div>`;
                         if (onComplete) onComplete();
                     }
                 })
@@ -971,13 +1002,15 @@
 	            const appended = [];
 
 	            messages.forEach(msg => {
-	                if (!msg || displayedMessageIds.has(msg.id)) return;
-	                displayedMessageIds.add(msg.id);
+	                const id = normalizeMessageId(msg && msg.id);
+	                if (!id || displayedMessageIds.has(id)) return;
+	                displayedMessageIds.add(id);
 	                const el = createMessageElement(msg);
 	                // 使用 CSS 默认动画，避免重复设置导致的抖动
 	                fragment.appendChild(el);
 	                appended.push(msg);
 	                updateLatestTimestamp(msg.timestamp);
+	                updateLatestId(msg.id);
 
 	                if (contentMayContainMath(msg.message)) {
 	                    const contentDiv = el.querySelector('.message-content');
@@ -1037,6 +1070,16 @@
             }
         }
 
+        function updateLatestId(id) {
+            const messageId = Number(id || 0);
+            if (!messageId) return;
+            if (isPublicChat) {
+                if (messageId > latestPublicId) latestPublicId = messageId;
+            } else {
+                if (messageId > latestPrivateId) latestPrivateId = messageId;
+            }
+        }
+
         function formatTime(timestamp) {
             if (!timestamp) return '未知时间';
             const date = new Date(timestamp * 1000);
@@ -1071,8 +1114,22 @@
 	            pollingInFlight = true;
 	            const formData = new FormData();
             formData.append('action', 'check_new_messages');
+            // ID 游标：避免同秒消息丢失
+            formData.append('lastPublicId', latestPublicId);
+            formData.append('lastPrivateId', latestPrivateId);
+            // 兼容字段（服务端若未更新可继续按 timestamp 逻辑走）
             formData.append('lastPublicTimestamp', latestPublicTimestamp);
             formData.append('lastPrivateTimestamp', latestPrivateTimestamp);
+
+            // 撤回检测：只关心当前已加载窗口范围内的消息
+            formData.append('minPublicId', publicHistoryState && publicHistoryState.oldestId ? publicHistoryState.oldestId : 0);
+            formData.append('maxPublicId', latestPublicId || 0);
+            const privateState = (typeof getPrivateHistoryState === 'function' && selectedReceiverId)
+                ? getPrivateHistoryState(selectedReceiverId)
+                : null;
+            formData.append('minPrivateId', privateState && privateState.oldestId ? privateState.oldestId : 0);
+            formData.append('maxPrivateId', latestPrivateId || 0);
+
             formData.append('currentReceiverId', selectedReceiverId || 0);
             formData.append('csrf_token', window.VENCHAT_CONFIG.csrfToken);
 
@@ -1088,25 +1145,42 @@
 	                    }
 
 	                    // 处理已撤回的消息
-	                    if (Array.isArray(data.recalledPublicIds) && data.recalledPublicIds.length > 0) {
-	                        data.recalledPublicIds.forEach(msgId => {
+	                    // 注意：公聊/私聊的消息 ID 不是全局唯一，必须只在当前面板处理，避免误删。
+	                    if (isPublicChat && Array.isArray(data.recalledPublicIds) && data.recalledPublicIds.length > 0) {
+	                        const recalled = new Set();
+	                        data.recalledPublicIds.forEach(rawId => {
+	                            const id = normalizeMessageId(rawId);
+	                            if (id) recalled.add(id);
+	                        });
+	                        recalled.forEach(msgId => {
 	                            const el = messagesContainer.querySelector(`[data-message-id="${msgId}"]`);
 	                            if (el) {
 	                                el.classList.add('message-removing');
 	                                el.addEventListener('animationend', () => el.remove(), { once: true });
-	                                displayedMessageIds.delete(msgId);
 	                            }
+	                            displayedMessageIds.delete(msgId);
 	                        });
+	                        if (recalled.size > 0 && Array.isArray(currentDisplayedMessages)) {
+	                            currentDisplayedMessages = currentDisplayedMessages.filter(m => !recalled.has(normalizeMessageId(m && m.id)));
+	                        }
 	                    }
-	                    if (Array.isArray(data.recalledPrivateIds) && data.recalledPrivateIds.length > 0) {
-	                        data.recalledPrivateIds.forEach(msgId => {
+	                    if (!isPublicChat && selectedReceiverId && Array.isArray(data.recalledPrivateIds) && data.recalledPrivateIds.length > 0) {
+	                        const recalled = new Set();
+	                        data.recalledPrivateIds.forEach(rawId => {
+	                            const id = normalizeMessageId(rawId);
+	                            if (id) recalled.add(id);
+	                        });
+	                        recalled.forEach(msgId => {
 	                            const el = messagesContainer.querySelector(`[data-message-id="${msgId}"]`);
 	                            if (el) {
 	                                el.classList.add('message-removing');
 	                                el.addEventListener('animationend', () => el.remove(), { once: true });
-	                                displayedMessageIds.delete(msgId);
 	                            }
+	                            displayedMessageIds.delete(msgId);
 	                        });
+	                        if (recalled.size > 0 && Array.isArray(currentDisplayedMessages)) {
+	                            currentDisplayedMessages = currentDisplayedMessages.filter(m => !recalled.has(normalizeMessageId(m && m.id)));
+	                        }
 	                    }
 
 	                    // 更新用户在线状态
@@ -1133,7 +1207,7 @@
 
             // 获取当前显示的所有自己发送的未读消息
             const unreadMessages = currentDisplayedMessages.filter(msg =>
-                msg.sender_id === currentUserId &&
+                Number(msg.sender_id) === Number(currentUserId) &&
                 (msg.is_read === false || msg.is_read === 0 || msg.is_read === '0' || msg.is_read === 'false' || !msg.is_read)
             );
 
@@ -1156,7 +1230,7 @@
                 if (data.success && data.messages) {
                     // 更新 currentDisplayedMessages 中的状态
                     data.messages.forEach(newMsg => {
-                        const index = currentDisplayedMessages.findIndex(m => m.id === newMsg.id);
+                        const index = currentDisplayedMessages.findIndex(m => normalizeMessageId(m && m.id) === normalizeMessageId(newMsg && newMsg.id));
                         if (index !== -1) {
                             currentDisplayedMessages[index].is_read = newMsg.is_read;
                         }
@@ -1232,8 +1306,9 @@
             const msgEl = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
             if (msgEl) {
                 const username = msgEl.querySelector('.username').textContent;
+                const safeUsername = (typeof escapeHtml === 'function') ? escapeHtml(username) : username;
                 const content = msgEl.querySelector('.message-content').innerHTML;
-                replyPreviewContent.innerHTML = `<strong>回复 ${username}:</strong> ${content}`;
+                replyPreviewContent.innerHTML = `<strong>回复 ${safeUsername}:</strong> ${content}`;
                 replyPreview.style.display = 'flex';
                 messageInput.focus();
                 updateScrollBtnPosition();
@@ -1251,11 +1326,18 @@
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    const el = messagesContainer.querySelector(`[data-message-id="${messageId}"]`);
+                    const normalizedId = normalizeMessageId(messageId);
+                    const el = messagesContainer.querySelector(`[data-message-id="${normalizedId || messageId}"]`);
                     if (el) {
                         // Smooth remove animation
                         el.classList.add('message-removing');
                         el.addEventListener('animationend', () => el.remove(), { once: true });
+                    }
+                    if (normalizedId) {
+                        displayedMessageIds.delete(normalizedId);
+                        if (Array.isArray(currentDisplayedMessages) && currentDisplayedMessages.length > 0) {
+                            currentDisplayedMessages = currentDisplayedMessages.filter(m => normalizeMessageId(m && m.id) !== normalizedId);
+                        }
                     }
                 } else {
                     showToast('撤回失败: ' + data.message, 'error');

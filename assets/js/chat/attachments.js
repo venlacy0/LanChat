@@ -251,7 +251,8 @@
             } else {
                 // 否则使用 Markdown 渲染
                 let html = renderMarkdown(content);
-                markdownPreview.innerHTML = html;
+                // 渲染结果仍需过滤（例如 markdown 链接可能带 javascript: 等危险协议）
+                markdownPreview.innerHTML = sanitizeHtml(html);
             }
 
             // 高亮代码块
@@ -269,9 +270,12 @@
             }
         }
 
-        // HTML 安全过滤函数 - 改进版本，防止过度过滤
+        // HTML 安全过滤函数（前端最后一道防线）
         function sanitizeHtml(html) {
-            // 允许的 HTML 标签（扩展范围以支持 Markdown 渲染）
+            if (html === null || html === undefined) return '';
+            html = String(html);
+
+            // 允许的 HTML 标签（扩展范围以支持 Markdown 渲染 / 卡片渲染）
             const allowedTags = [
                 'p', 'br', 'b', 'strong', 'i', 'em', 'u', 's', 'del', 'ins',
                 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -281,6 +285,7 @@
                 'mark', 'sub', 'sup', 'small', 'kbd', 'var',
                 'iframe'
             ];
+
             const allowedAttributes = {
                 'a': ['href', 'target', 'title', 'rel'],
                 'img': ['src', 'alt', 'width', 'height', 'title'],
@@ -297,17 +302,17 @@
 
             const allowedIframeHosts = [
                 // 音乐平台
-                'music.163.com',          // NetEase Cloud Music
-                'y.qq.com',               // QQ Music
-                'open.spotify.com',       // Spotify
-                'embed.music.apple.com',  // Apple Music embed
-                'music.apple.com',        // Apple Music
-                'w.soundcloud.com',       // SoundCloud
-                'bandcamp.com',           // Bandcamp
-                'widget.deezer.com',      // Deezer
-                'www.deezer.com',         // Deezer legacy embeds
-                'www.mixcloud.com',       // Mixcloud
-                'embed.tidal.com',        // Tidal
+                'music.163.com',
+                'y.qq.com',
+                'open.spotify.com',
+                'embed.music.apple.com',
+                'music.apple.com',
+                'w.soundcloud.com',
+                'bandcamp.com',
+                'widget.deezer.com',
+                'www.deezer.com',
+                'www.mixcloud.com',
+                'embed.tidal.com',
 
                 // 视频平台
                 'www.youtube.com',
@@ -322,12 +327,52 @@
                 'v.qq.com'
             ];
 
-            function normalizeIframeSrc(src) {
-                const trimmed = (src || '').trim();
-                if (!trimmed) return '';
-                if (trimmed.startsWith('//')) {
-                    return 'https:' + trimmed;
+            function escapeHtmlLocal(text) {
+                const div = document.createElement('div');
+                const safe = (text === null || text === undefined) ? '' : text;
+                div.textContent = String(safe);
+                return div.innerHTML;
+            }
+
+            function normalizePotentialUrl(raw) {
+                const safe = (raw === null || raw === undefined) ? '' : raw;
+                return String(safe).trim();
+            }
+
+            function isSafeHref(raw) {
+                const value = normalizePotentialUrl(raw);
+                if (!value) return false;
+                if (value.startsWith('#')) return true;
+                try {
+                    const url = new URL(value, window.location.origin);
+                    const p = (url.protocol || '').toLowerCase();
+                    return (p === 'http:' || p === 'https:' || p === 'mailto:' || p === 'tel:');
+                } catch (e) {
+                    return false;
                 }
+            }
+
+            function isSafeSrc(raw) {
+                const value = normalizePotentialUrl(raw);
+                if (!value) return false;
+                try {
+                    const url = new URL(value, window.location.origin);
+                    const p = (url.protocol || '').toLowerCase();
+                    if (p === 'http:' || p === 'https:' || p === 'blob:') return true;
+                    if (p === 'data:') {
+                        // 保留一定“自由度”，但阻断明显可执行 HTML 载荷
+                        return !/^data\s*:\s*text\s*\/\s*html/i.test(value);
+                    }
+                    return false;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function normalizeIframeSrc(src) {
+                const trimmed = normalizePotentialUrl(src);
+                if (!trimmed) return '';
+                if (trimmed.startsWith('//')) return 'https:' + trimmed;
                 return trimmed;
             }
 
@@ -336,7 +381,8 @@
                 if (!normalized) return false;
                 try {
                     const url = new URL(normalized, window.location.origin);
-                    if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
+                    const p = (url.protocol || '').toLowerCase();
+                    if (p !== 'https:' && p !== 'http:') return false;
                     return allowedIframeHosts.some(host => url.hostname === host);
                 } catch (e) {
                     return false;
@@ -344,111 +390,128 @@
             }
 
             try {
-                // 创建临时 DOM 来处理 HTML
                 const tempDiv = document.createElement('div');
                 tempDiv.innerHTML = html;
 
-                // 递归清理所有节点
                 function cleanNode(node) {
+                    if (!node) return false;
+
                     if (node.nodeType === Node.TEXT_NODE) return true;
 
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const tagName = node.tagName.toLowerCase();
+                    // 移除注释节点
+                    if (node.nodeType === Node.COMMENT_NODE) {
+                        node.remove();
+                        return false;
+                    }
 
-                        // 检查标签是否被允许
-                        if (!allowedTags.includes(tagName)) {
-                            // 不允许的标签，保留其文本内容和子节点
-                            const fragment = document.createDocumentFragment();
-                            for (let child of Array.from(node.childNodes)) {
-                                fragment.appendChild(child.cloneNode(true));
+                    if (node.nodeType !== Node.ELEMENT_NODE) {
+                        // 其他类型节点直接移除
+                        if (typeof node.remove === 'function') {
+                            node.remove();
+                        } else if (node.parentNode) {
+                            node.parentNode.removeChild(node);
+                        }
+                        return false;
+                    }
+
+                    const tagName = node.tagName.toLowerCase();
+
+                    // 不允许的标签：剥离标签但保留内容（并继续清理其子节点）
+                    if (!allowedTags.includes(tagName)) {
+                        const children = Array.from(node.childNodes);
+                        const fragment = document.createDocumentFragment();
+                        children.forEach(child => fragment.appendChild(child)); // move
+                        node.replaceWith(fragment);
+                        children.forEach(child => cleanNode(child));
+                        return false;
+                    }
+
+                    // 清理属性
+                    const allowedAttrs = allowedAttributes[tagName] || allowedAttributes['*'] || [];
+                    const toRemove = [];
+
+                    for (const attr of Array.from(node.attributes)) {
+                        const name = String(attr.name || '').toLowerCase();
+                        if (!allowedAttrs.includes(name)) {
+                            toRemove.push(attr.name);
+                            continue;
+                        }
+
+                        if (name === 'href') {
+                            const href = node.getAttribute('href') || '';
+                            if (!isSafeHref(href)) {
+                                toRemove.push(attr.name);
                             }
-                            node.replaceWith(fragment);
+                        }
+
+                        if (name === 'src' && tagName !== 'iframe') {
+                            const src = node.getAttribute('src') || '';
+                            if (!isSafeSrc(src)) {
+                                toRemove.push(attr.name);
+                            }
+                        }
+                    }
+
+                    toRemove.forEach(name => node.removeAttribute(name));
+
+                    // a[target=_blank] 防 tabnabbing
+                    if (tagName === 'a') {
+                        const target = (node.getAttribute('target') || '').toLowerCase();
+                        if (target === '_blank') {
+                            const rel = (node.getAttribute('rel') || '').toLowerCase();
+                            const needsNoopener = !rel.includes('noopener');
+                            const needsNoreferrer = !rel.includes('noreferrer');
+                            if (needsNoopener || needsNoreferrer) {
+                                const parts = rel.split(/\s+/).filter(Boolean);
+                                if (needsNoopener) parts.push('noopener');
+                                if (needsNoreferrer) parts.push('noreferrer');
+                                node.setAttribute('rel', parts.join(' '));
+                            }
+                        }
+                    }
+
+                    // iframe：强制白名单 host
+                    if (tagName === 'iframe') {
+                        const src = node.getAttribute('src') || '';
+                        if (!isAllowedIframeSrc(src)) {
+                            node.remove();
                             return false;
                         }
-
-                        // 清理属性
-                        const allowedAttrs = allowedAttributes[tagName] || allowedAttributes['*'] || [];
-                        const nodesToRemove = [];
-
-                        for (let attr of node.attributes) {
-                            if (!allowedAttrs.includes(attr.name)) {
-                                nodesToRemove.push(attr.name);
-                            } else if (attr.name === 'href' || attr.name === 'src') {
-                                // 验证属性值，防止 XSS
-                                if (attr.value.startsWith('javascript:') || attr.value.startsWith('vbscript:') ||
-                                    attr.value.startsWith('data:text/html')) {
-                                    nodesToRemove.push(attr.name);
-                                }
-                            }
+                        const normalized = normalizeIframeSrc(src);
+                        if (normalized && normalized !== src) {
+                            node.setAttribute('src', normalized);
                         }
-
-                        // 移除不允许的属性
-                        nodesToRemove.forEach(attr => node.removeAttribute(attr));
-
-                        if (tagName === 'iframe') {
-                            const src = node.getAttribute('src') || '';
-                            if (!isAllowedIframeSrc(src)) {
-                                node.remove();
-                                return false;
-                            }
-                            const normalized = normalizeIframeSrc(src);
-                            if (normalized && normalized !== src) {
-                                node.setAttribute('src', normalized);
-                            }
-                            if (!node.getAttribute('loading')) {
-                                node.setAttribute('loading', 'lazy');
-                            }
-                            if (!node.getAttribute('referrerpolicy')) {
-                                node.setAttribute('referrerpolicy', 'no-referrer');
-                            }
-                            // 根据来源分类 iframe：音乐类 vs 视频类
-                            try {
-                                const iframeUrl = new URL(normalized || src, window.location.origin);
-                                const musicHosts = [
-                                    'music.163.com', 'y.qq.com', 'open.spotify.com',
-                                    'embed.music.apple.com', 'music.apple.com',
-                                    'w.soundcloud.com', 'bandcamp.com',
-                                    'widget.deezer.com', 'www.deezer.com',
-                                    'www.mixcloud.com', 'embed.tidal.com'
-                                ];
-                                const videoHosts = [
-                                    'www.youtube.com', 'www.youtube-nocookie.com',
-                                    'player.vimeo.com', 'player.bilibili.com',
-                                    'www.dailymotion.com', 'player.twitch.tv',
-                                    'www.tiktok.com', 'player.youku.com',
-                                    'player.video.iqiyi.com', 'v.qq.com'
-                                ];
-                                if (musicHosts.some(h => iframeUrl.hostname === h || iframeUrl.hostname.endsWith('.' + h))) {
-                                    node.classList.add('embed-music');
-                                } else if (videoHosts.some(h => iframeUrl.hostname === h)) {
-                                    node.classList.add('embed-video');
-                                }
-                            } catch (e) { /* 分类失败不影响渲染 */ }
+                        if (!node.getAttribute('loading')) {
+                            node.setAttribute('loading', 'lazy');
                         }
-
-                        // 递归清理子节点
-                        for (let child of Array.from(node.childNodes)) {
-                            cleanNode(child);
+                        if (!node.getAttribute('referrerpolicy')) {
+                            node.setAttribute('referrerpolicy', 'no-referrer');
                         }
+                    }
+
+                    // 递归清理子节点
+                    for (const child of Array.from(node.childNodes)) {
+                        cleanNode(child);
                     }
 
                     return true;
                 }
 
-                cleanNode(tempDiv);
+                for (const child of Array.from(tempDiv.childNodes)) {
+                    cleanNode(child);
+                }
+
                 const result = tempDiv.innerHTML;
 
-                // 如果结果为空但原 HTML 不为空，返回原 HTML（可能被过度过滤了）
+                // 绝不能回退到原始 HTML（会导致 XSS 绕过）
                 if (!result || !result.trim()) {
-                    console.warn('sanitizeHtml: 过滤后内容为空，可能过度过滤了');
-                    return html;
+                    return escapeHtmlLocal(html);
                 }
 
                 return result;
             } catch (error) {
                 console.error('sanitizeHtml 错误:', error);
-                // 出错时返回原 HTML
-                return html;
+                return escapeHtmlLocal(html);
             }
         }
 
