@@ -144,7 +144,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'messages' => array_reverse($messages), // 返回时按时间升序
+        'messages' => $messages, // 保持后端返回顺序：最新在前（new -> old）
         'hasMore' => $hasMore,
         'count' => count($messages)
     ]);

@@ -26,6 +26,19 @@ if ($file['size'] > $config['max_file_size']) {
 // 获取文件扩展名
 $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
 
+// 强制阻断高危可执行脚本类型（即使 allowed_file_types 为空，也不允许）
+// 说明：项目主打自由投放，但这些类型在常见 Web 环境下可能导致服务端代码执行。
+$dangerous_exts = [
+    // PHP 相关
+    'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'pht', 'phar',
+    // 其他常见脚本/服务端执行类型
+    'cgi', 'pl', 'asp', 'aspx', 'jsp', 'jspx', 'shtml'
+];
+if ($file_ext !== '' && in_array($file_ext, $dangerous_exts, true)) {
+    echo json_encode(['success' => false, 'message' => '不允许上传该类型文件']);
+    exit;
+}
+
 // 验证文件类型
 if (!empty($config['allowed_file_types'])) {
     if (!in_array($file_ext, $config['allowed_file_types'])) {
@@ -34,8 +47,9 @@ if (!empty($config['allowed_file_types'])) {
     }
 }
 
-// 生成安全的文件名
-$safe_filename = bin2hex(random_bytes(16)) . '.' . $file_ext;
+// 生成安全的文件名（无扩展名时不要拼接尾随点，避免 Windows 等平台路径问题）
+$rand = bin2hex(random_bytes(16));
+$safe_filename = ($file_ext !== '') ? ($rand . '.' . $file_ext) : $rand;
 
 // 本地上传目录
 $upload_dir = $config['upload_dir'];

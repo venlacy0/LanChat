@@ -4,6 +4,7 @@ return [
     // 数据库配置
     'db' => [
         'host' => getenv('DB_HOST') ?: 'db',
+        'port' => (int)(getenv('DB_PORT') ?: 3306),
         'user' => getenv('DB_USER') ?: 'venlanchat_user',
         'pass' => getenv('DB_PASS') ?: 'venlanchat_pass_2026',
         'name' => getenv('DB_NAME') ?: 'venlanchat',

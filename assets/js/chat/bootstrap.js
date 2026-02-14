@@ -1,6 +1,9 @@
         // --- State Variables ---
 	        let latestPublicTimestamp = 0;
 	        let latestPrivateTimestamp = 0;
+	        // 使用 ID 游标避免同秒多消息丢失（timestamp 仅用于展示/兼容）
+	        let latestPublicId = 0;
+	        let latestPrivateId = 0;
 	        let pollingInterval = null;
 	        let pollingInFlight = false;
 	        let isPublicChat = true;

@@ -9,24 +9,45 @@
  * 3. 点击"开始迁移"按钮
  */
 
-// 开启错误报告
+// 开启错误报告（生产环境建议关闭 display_errors）
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+if (isset($_GET['debug']) && $_GET['debug'] === '1') {
+    ini_set('display_errors', 1);
+} else {
+    ini_set('display_errors', 0);
+}
 
-// 加载配置和数据库连接
-require_once '../../config.php';
-require_once '../../db_connect.php';
+// 加载配置和数据库连接（使用绝对路径，避免转发入口导致相对路径错乱）
+$config = require __DIR__ . '/../../../config.php';
+require_once __DIR__ . '/../../../db_connect.php';
 
 $migration_complete = false;
 $migration_results = [];
 $has_error = false;
 $authenticated = false;
 
-// 处理认证
+// 处理认证（兼容明文与 password_hash）
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_password'])) {
-    if ($_POST['admin_password'] === $config['admin_password']) {
-        $authenticated = true;
+    $provided = (string)($_POST['admin_password'] ?? '');
+    $stored = (string)($config['admin_password'] ?? '');
+
+    $isHash = false;
+    if ($stored !== '') {
+        $info = password_get_info($stored);
+        $isHash = isset($info['algo']) && $info['algo'] !== 0;
+    }
+
+    if ($isHash) {
+        if (password_verify($provided, $stored)) {
+            $authenticated = true;
+        }
     } else {
+        if ($stored !== '' && hash_equals($stored, $provided)) {
+            $authenticated = true;
+        }
+    }
+
+    if (!$authenticated) {
         $migration_results[] = ['success' => false, 'message' => '管理员密码错误'];
         $has_error = true;
     }
@@ -36,9 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['admin_password'])) {
 if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['migrate'])) {
     try {
         // 1. 读取 JSON 文件
-        $json_file = '../../data/messages.json';
+        $json_file = __DIR__ . '/../../../data/messages.json';
         if (!file_exists($json_file)) {
-            $migration_results[] = ['success' => false, 'message' => '消息文件不存在: ' . $json_file];
+            $migration_results[] = ['success' => false, 'message' => '消息文件不存在: ' . basename($json_file)];
             $has_error = true;
         } else {
             $json_content = file_get_contents($json_file);
@@ -93,7 +114,7 @@ if ($authenticated && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mig
                             $message = $msg['message'] ?? '';
                             $timestamp = intval($msg['timestamp'] ?? time());
                             $ip = $msg['ip'] ?? '0.0.0.0';
-                            $recalled = $msg['recalled'] ? 1 : 0;
+                            $recalled = !empty($msg['recalled']) ? 1 : 0;
 
                             $stmt->bind_param(
                                 'isssiisi',
